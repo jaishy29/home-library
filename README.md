@@ -1,6 +1,21 @@
 # Home Library
 
-A cosy pink iPhone app for cataloguing the books on your shelves.
+A cosy pink app for cataloguing the books on your shelves.
+
+There are two versions in this repo:
+
+- **`pwa/`: the web app (use this one).** Hosted on Vercel; add it to your iPhone's Home Screen and it opens like an app. No Xcode needed.
+- **`HomeLibrary/`: a native SwiftUI iPhone app.** Needs Xcode to build. It hasn't been compiled yet.
+
+## Web app (Vercel)
+
+1. Go to https://vercel.com/new, sign in with GitHub, and import this repo. Leave every setting as it is (`vercel.json` already points Vercel at `pwa/`) and click **Deploy**.
+2. On your iPhone, open the Vercel link in **Safari**, tap **Share → Add to Home Screen**.
+3. Books are stored on the phone. Use **Back up library** now and then and keep the file somewhere safe (Files, iCloud Drive).
+
+Every push to `main` redeploys the site automatically.
+
+## Native iPhone app
 
 - **Scan books** with the camera: point it at the barcode on the back cover. The title, author, year and cover are filled in from Open Library, with Google Books as a fallback.
 - **Track reading**: To be read, Reading, or Read (with the date you finished).
