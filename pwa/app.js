@@ -209,41 +209,183 @@ async function save(ev) {
   catch (e) { toast("Couldn't save. Your phone may be out of storage."); }
 }
 
-/* ---------- live barcode scanner ---------- */
-let reader = null, scanning = false;
-function hints() {
-  const h = new Map();
-  h.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8, ZXing.BarcodeFormat.UPC_A]);
-  h.set(ZXing.DecodeHintType.TRY_HARDER, true);
-  return h;
+/* ---------- barcode decoding ---------- */
+// Decodes book barcodes from a canvas region. Tries the native BarcodeDetector
+// when the browser has one, then ZXing on the region and on it rotated 90°.
+let zxReader = null;
+function zx() {
+  if (!zxReader && window.ZXing) {
+    const h = new Map();
+    h.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.UPC_A, ZXing.BarcodeFormat.EAN_8]);
+    h.set(ZXing.DecodeHintType.TRY_HARDER, true);
+    zxReader = new ZXing.MultiFormatReader(); zxReader.setHints(h);
+  }
+  return zxReader;
 }
+function lumaOf(ctx, w, h) {
+  const px = ctx.getImageData(0, 0, w, h).data, out = new Uint8ClampedArray(w * h);
+  for (let i = 0, j = 0; j < out.length; i += 4, j++) out[j] = (px[i] * 77 + px[i + 1] * 150 + px[i + 2] * 29) >> 8;
+  return out;
+}
+function zxDecodeLuma(luma, w, h) {
+  const r = zx(); if (!r) return null;
+  try {
+    const bmp = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(new ZXing.RGBLuminanceSource(luma, w, h)));
+    return r.decodeWithState(bmp).getText();
+  } catch (e) { return null; } finally { try { r.reset(); } catch (e) {} }
+}
+function rotateLuma(l, w, h) { // 90° clockwise
+  const out = new Uint8ClampedArray(w * h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) out[x * h + (h - 1 - y)] = l[y * w + x];
+  return out;
+}
+let detector = null;
+try { if ("BarcodeDetector" in window) detector = new BarcodeDetector({ formats: ["ean_13", "upc_a", "ean_8"] }); } catch (e) { detector = null; }
+
+const work = document.createElement("canvas");
+const wctx = work.getContext("2d", { willReadFrequently: true });
+/** Draw (sx,sy,sw,sh) of `src` scaled to at most maxW wide, then decode. */
+async function decodeRegion(src, sx, sy, sw, sh, maxW, tryRotate) {
+  const scale = Math.min(1, maxW / sw);
+  const w = Math.max(1, Math.round(sw * scale)), h = Math.max(1, Math.round(sh * scale));
+  work.width = w; work.height = h;
+  wctx.drawImage(src, sx, sy, sw, sh, 0, 0, w, h);
+  if (detector) {
+    try { for (const r of await detector.detect(work)) { const n = bookIsbn(r.rawValue); if (n) return n; } } catch (e) {}
+  }
+  const l = lumaOf(wctx, w, h);
+  let t = decodeWithCleanup(l, w, h);
+  if (!t && tryRotate) t = decodeWithCleanup(rotateLuma(l, w, h), h, w);
+  return t ? (bookIsbn(t) || { notBook: t }) : null;
+}
+// Camera frames are noisy and a little soft. Bars are vertical, so averaging
+// down each column removes noise without smearing them; a light horizontal
+// sharpen helps slightly out-of-focus frames.
+function decodeWithCleanup(l, w, h) {
+  let t = zxDecodeLuma(l, w, h); if (t) return t;
+  const smooth = stretch(smoothV(l, w, h, Math.max(2, Math.round(h / 60))));
+  t = zxDecodeLuma(smooth, w, h); if (t) return t;
+  return zxDecodeLuma(sharpenH(smooth, w, h, 1.2), w, h);
+}
+function smoothV(l, w, h, k) {
+  const o = new Uint8ClampedArray(w * h);
+  for (let x = 0; x < w; x++) {
+    let s = 0, n = 0;
+    for (let y = 0; y < h + k; y++) {
+      if (y < h) { s += l[y * w + x]; n++; }
+      if (y - 2 * k - 1 >= 0) { s -= l[(y - 2 * k - 1) * w + x]; n--; }
+      const c = y - k; if (c >= 0 && c < h) o[c * w + x] = s / n;
+    }
+  }
+  return o;
+}
+function sharpenH(l, w, h, a) {
+  const o = new Uint8ClampedArray(w * h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = y * w + x, c = l[i], lf = x ? l[i - 1] : c, rt = x < w - 1 ? l[i + 1] : c;
+    o[i] = c + a * (2 * c - lf - rt);
+  }
+  return o;
+}
+function stretch(l) {
+  let lo = 255, hi = 0;
+  for (let i = 0; i < l.length; i += 7) { if (l[i] < lo) lo = l[i]; if (l[i] > hi) hi = l[i]; }
+  const r = Math.max(1, hi - lo), o = new Uint8ClampedArray(l.length);
+  for (let i = 0; i < l.length; i++) o[i] = (l[i] - lo) * 255 / r;
+  return o;
+}
+function bookIsbn(text) {
+  let d = cleanIsbn(text);
+  if (d.length === 12) d = "0" + d; // UPC-A seen as 12 digits
+  return isBookCode(d) ? d : null;
+}
+
+/* ---------- live camera scanner ---------- */
+let stream = null, scanning = false, frameNo = 0, lastNote = 0, lastOther = null;
 async function startScan() {
   $("scanner").hidden = false; $("typedIsbn").value = "";
-  $("scanMsg").textContent = "Point the camera at the barcode on the back cover";
-  if (!window.ZXing || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    $("scanMsg").textContent = "This browser can't use the camera. Type the ISBN instead."; return;
+  setScanMsg("Starting the camera…");
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    setScanMsg("This browser can't use the live camera. Tap “Take a photo” or type the ISBN."); return;
   }
-  scanning = true;
   try {
-    reader = new ZXing.BrowserMultiFormatReader(hints(), 250);
-    await reader.decodeFromConstraints({ audio: false, video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } } }, $("video"), (result) => {
-      if (!scanning || !result) return;
-      const text = result.getText();
-      if (isBookCode(text)) { scanning = false; if (navigator.vibrate) navigator.vibrate(60); gotIsbn(normIsbn(text)); }
-      else $("scanMsg").textContent = "That's not a book barcode. Look for the one starting 978 or 979.";
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } },
     });
   } catch (e) {
-    $("scanMsg").textContent = e && e.name === "NotAllowedError"
-      ? "Camera access is off. Allow it in Settings → Safari → Camera, or type the ISBN."
-      : "Couldn't start the camera. Type the ISBN instead.";
+    setScanMsg(e && e.name === "NotAllowedError"
+      ? "Camera access is blocked. On iPhone: Settings → Safari → Camera → Allow, then reopen the app. Or tap “Take a photo”."
+      : "Couldn't start the camera. Tap “Take a photo” or type the ISBN.");
+    return;
   }
+  const track = stream.getVideoTracks()[0];
+  // Continuous focus and a little zoom let you hold the book far enough away to stay sharp.
+  try {
+    const caps = track.getCapabilities ? track.getCapabilities() : {};
+    const adv = {};
+    if (caps.focusMode && caps.focusMode.includes("continuous")) adv.focusMode = "continuous";
+    if (caps.zoom && caps.zoom.max >= 1.6) adv.zoom = Math.min(2, caps.zoom.max);
+    if (Object.keys(adv).length) await track.applyConstraints({ advanced: [adv] });
+  } catch (e) {}
+  const v = $("video");
+  v.setAttribute("playsinline", ""); v.muted = true; v.srcObject = stream;
+  try { await v.play(); } catch (e) {}
+  scanning = true; frameNo = 0; lastNote = Date.now();
+  setScanMsg("Hold the barcode inside the pink box, about a hand's length away");
+  loop();
 }
-function stopScan() { scanning = false; try { reader && reader.reset(); } catch (e) {} reader = null; $("scanner").hidden = true; }
+function setScanMsg(m) { $("scanMsg").textContent = m; }
+async function loop() {
+  if (!scanning) return;
+  const v = $("video");
+  if (v.readyState >= 2 && v.videoWidth) {
+    frameNo++;
+    const W = v.videoWidth, H = v.videoHeight;
+    // the middle of the picture, where the pink box is
+    const sw = Math.round(W * 0.9), sh = Math.round(H * (W > H ? 0.6 : 0.4));
+    const sx = Math.round((W - sw) / 2), sy = Math.round((H - sh) / 2);
+    const r = await decodeRegion(v, sx, sy, sw, sh, frameNo % 2 ? 1000 : 1400, frameNo % 3 === 0);
+    if (!scanning) return;
+    if (typeof r === "string") { scanning = false; if (navigator.vibrate) navigator.vibrate(60); gotIsbn(r); return; }
+    if (r && r.notBook) { if (r.notBook === lastOther) setScanMsg("That barcode isn't an ISBN. Look for the one starting 978 or 979."); lastOther = r.notBook; }
+    else if (Date.now() - lastNote > 9000) { lastNote = Date.now(); setScanMsg("Still looking… Try more light, hold steadier, or tap “Take a photo”."); }
+  }
+  setTimeout(() => requestAnimationFrame(loop), 60);
+}
+function stopScan() {
+  scanning = false;
+  try { stream && stream.getTracks().forEach(t => t.stop()); } catch (e) {}
+  stream = null; $("video").srcObject = null; $("scanner").hidden = true;
+}
 function gotIsbn(isbn) {
   stopScan();
   const dup = books.find(b => b.isbn === isbn);
   if (dup) { toast(`Already on your shelf: “${dup.title}”`); openSheet(dup); return; }
   openSheet(null); $("f-isbn").value = fmtIsbn(isbn); isbnHint(); fillFromIsbn(isbn, true);
+}
+
+/* ---------- scan from a still photo ---------- */
+async function scanPhoto(file) {
+  setScanMsg("Reading the photo…");
+  let img;
+  try {
+    const url = URL.createObjectURL(file);
+    img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
+  } catch (e) { setScanMsg("Couldn't open that photo. Try again or type the ISBN."); return; }
+  const W = img.naturalWidth, H = img.naturalHeight;
+  const tries = [
+    [0, 0, W, H, 1600], [0, 0, W, H, 1000],
+    [W * .1, H * .25, W * .8, H * .5, 1400], [W * .1, H * .1, W * .8, H * .8, 1200],
+    [0, 0, W, H, 2400],
+  ];
+  for (const [x, y, w, h, m] of tries) {
+    const r = await decodeRegion(img, Math.round(x), Math.round(y), Math.round(w), Math.round(h), m, true);
+    if (typeof r === "string") { gotIsbn(r); return; }
+    if (r && r.notBook) { setScanMsg("That barcode isn't an ISBN. Look for the one starting 978 or 979."); return; }
+  }
+  setScanMsg("Couldn't find a barcode in that photo. Fill the frame with the barcode and make sure it's sharp, or type the ISBN.");
+  if (stream) { scanning = true; loop(); }
 }
 
 /* ---------- cover photo ---------- */
@@ -286,6 +428,8 @@ $("q").addEventListener("input", render); $("sort").addEventListener("change", r
 $("listWrap").addEventListener("click", e => { const r = e.target.closest(".row"); if (!r) return; const b = books.find(x => x.id === r.dataset.id); if (b) openSheet(b); });
 $("scanBtn").addEventListener("click", startScan);
 $("cancelScan").addEventListener("click", stopScan);
+$("photoScan").addEventListener("click", () => { $("scanPhotoFile").value = ""; $("scanPhotoFile").click(); });
+$("scanPhotoFile").addEventListener("change", e => { const f = e.target.files[0]; if (f) { scanning = false; scanPhoto(f); } });
 $("typedGo").addEventListener("click", () => { const n = normIsbn($("typedIsbn").value); if (n) gotIsbn(n); else $("scanMsg").textContent = "That ISBN doesn't look right. Check the number."; });
 $("typedIsbn").addEventListener("keydown", e => { if (e.key === "Enter") $("typedGo").click(); });
 $("addBtn").addEventListener("click", () => openSheet(null));

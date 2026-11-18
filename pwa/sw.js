@@ -1,5 +1,5 @@
 // Keeps the app working offline. Bump VERSION when shipping changes.
-const VERSION = "v1";
+const VERSION = "v2";
 const SHELL = ["./", "index.html", "app.js", "vendor/zxing.min.js", "manifest.webmanifest", "icons/icon-180.png", "icons/icon-192.png", "icons/icon-512.png"];
 
 self.addEventListener("install", e => {

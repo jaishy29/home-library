@@ -217,6 +217,7 @@ img.cover{background:var(--surface-2)}
   <button class="btn" id="addBtn">Add by hand</button>
 </div>
 <input type="file" id="coverCam" accept="image/*" capture="environment">
+<input type="file" id="scanPhotoFile" accept="image/*" capture="environment">
 <input type="file" id="importFile" accept="application/json,.json">
 
 <div class="scanner" id="scanner" hidden>
@@ -225,6 +226,7 @@ img.cover{background:var(--surface-2)}
   <div class="scan-top"><button class="btn" id="cancelScan">Cancel</button></div>
   <div class="scan-ui">
     <p id="scanMsg">Point the camera at the barcode on the back cover</p>
+    <button class="btn" id="photoScan">Take a photo instead</button>
     <div class="row2">
       <input id="typedIsbn" inputmode="numeric" placeholder="Or type the ISBN" aria-label="ISBN">
       <button class="btn primary" id="typedGo">Look up</button>
