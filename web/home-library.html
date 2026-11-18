@@ -1,0 +1,564 @@
+<title>Home Library</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one narrow column (phone-first) — a cosy pink reading nook: shelf header, stat cards, a bookshelf list of books; a bottom sheet for scan/add/edit. */
+:root{
+  --bg:#fff2f7; --dot:#ffd9e8; --surface:#ffffff; --surface-2:#ffe6f0; --line:#f7cbdc;
+  --ink:#4a2236; --muted:#a06483; --accent:#e0528b; --accent-2:#ff9fc3; --accent-ink:#ffffff;
+  --shelf:#f3a8c4; --shelf-edge:#d97ca1;
+  --read:#2f8a63; --read-bg:#dcf5e8; --reading:#a8600c; --reading-bg:#ffedcf;
+  --loan:#7b4fc4; --loan-bg:#eee4fd; --unread:#b2457a; --unread-bg:#ffe3ee;
+  --shadow:0 10px 30px rgba(176,60,110,.18);
+  --f-display:"Fredoka","Nunito",ui-rounded,system-ui,sans-serif;
+  --f-body:"Nunito",ui-rounded,ui-sans-serif,system-ui,-apple-system,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#22131b; --dot:#33192a; --surface:#2e1925; --surface-2:#3b2030; --line:#583246;
+  --ink:#ffe6f1; --muted:#d79bb9; --accent:#ff8fbd; --accent-2:#c4558a; --accent-ink:#2a0f1c;
+  --shelf:#8a3d61; --shelf-edge:#6a2c4a;
+  --read:#8fe0bb; --read-bg:#1c3a2d; --reading:#ffcf80; --reading-bg:#3d2c14;
+  --loan:#cbb0ff; --loan-bg:#30254a; --unread:#f8b9d6; --unread-bg:#3b2030;
+  --shadow:0 10px 30px rgba(0,0,0,.5); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#22131b; --dot:#33192a; --surface:#2e1925; --surface-2:#3b2030; --line:#583246;
+  --ink:#ffe6f1; --muted:#d79bb9; --accent:#ff8fbd; --accent-2:#c4558a; --accent-ink:#2a0f1c;
+  --shelf:#8a3d61; --shelf-edge:#6a2c4a;
+  --read:#8fe0bb; --read-bg:#1c3a2d; --reading:#ffcf80; --reading-bg:#3d2c14;
+  --loan:#cbb0ff; --loan-bg:#30254a; --unread:#f8b9d6; --unread-bg:#3b2030;
+  --shadow:0 10px 30px rgba(0,0,0,.5); color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background-color:var(--bg);background-image:radial-gradient(var(--dot) 1.6px,transparent 1.8px);background-size:22px 22px;color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45}
+.hero{display:flex;gap:14px;align-items:center}
+.hero svg{flex:none}
+.stamp{display:inline-block;margin-top:6px;font-family:var(--f-display);font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);border:1.5px dashed var(--accent);border-radius:999px;padding:2px 10px;transform:rotate(-2deg)}
+.shelf-list{position:relative;padding-bottom:14px}
+.shelf-list::after{content:"";position:absolute;left:-6px;right:-6px;bottom:0;height:12px;border-radius:4px;background:var(--shelf);box-shadow:inset 0 -3px 0 var(--shelf-edge)}
+.ribbon{position:absolute;top:-2px;right:6px;width:9px;height:18px;background:var(--accent);clip-path:polygon(0 0,100% 0,100% 100%,50% 75%,0 100%)}
+.cover-wrap{position:relative;width:44px;height:64px}
+.foot{text-align:center;color:var(--muted);font-family:var(--f-display);font-size:13px;display:flex;justify-content:center;align-items:center;gap:6px}
+.wrap{max-width:760px;margin:0 auto;padding-block:20px 120px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:18px}
+h1,h2,h3{font-family:var(--f-display);margin:0;text-wrap:balance;letter-spacing:-.01em}
+h1{font-size:32px;font-weight:700;color:var(--accent);line-height:1.05}
+.top{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.sub{color:var(--muted);font-size:13px}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn{border:1.5px solid var(--line);background:var(--surface);border-radius:999px;padding:9px 16px;font-weight:700;display:inline-flex;align-items:center;gap:8px;justify-content:center}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:transparent;box-shadow:0 3px 0 var(--accent-2)}
+.btn.danger{color:var(--loan);border-color:var(--loan)}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--muted)}
+.btn:disabled{opacity:.55;cursor:default}
+
+/* stats */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.stat{background:var(--surface);border:1.5px solid var(--line);border-radius:18px;padding:10px 14px;text-align:left;display:flex;flex-direction:column;gap:2px}
+.stat b{font-family:var(--f-display);font-size:28px;font-weight:600;color:var(--accent);font-variant-numeric:tabular-nums;line-height:1.1}
+.stat span{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+.stat[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.stat.loan b{color:var(--loan)}
+.stat.read b{color:var(--read)}
+@media (max-width:440px){.stats{grid-template-columns:repeat(2,1fr)}}
+
+.tools{display:flex;gap:8px;flex-wrap:wrap}
+.tools input{flex:1 1 200px;min-width:0;border:1.5px solid var(--line);background:var(--surface);border-radius:999px;padding:9px 16px}
+.tools select{border:1.5px solid var(--line);background:var(--surface);border-radius:999px;padding:9px 12px}
+
+.banner{background:var(--surface-2);color:var(--ink);border-radius:12px;padding:10px 14px;display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;font-size:14px}
+
+/* list */
+.list{display:flex;flex-direction:column;background:var(--surface);border:1.5px solid var(--line);border-radius:20px;overflow:hidden}
+.row{display:grid;grid-template-columns:44px 1fr auto;gap:12px;align-items:center;padding:12px 14px;border:0;border-top:1px solid var(--line);background:transparent;text-align:left;width:100%}
+.row:first-child{border-top:0}
+.row:hover{background:var(--surface-2)}
+.cover{width:44px;height:64px;border-radius:3px 8px 8px 3px;object-fit:cover;display:flex;align-items:flex-end;padding:4px;color:#fff;font-family:var(--f-display);font-weight:700;font-size:11px;line-height:1.05;overflow:hidden;box-shadow:inset 3px 0 0 rgba(0,0,0,.18)}
+.meta{min-width:0;display:flex;flex-direction:column;gap:3px}
+.meta .t{font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.meta .a{color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
+.pill{font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.pill.read{background:var(--read-bg);color:var(--read)}
+.pill.reading{background:var(--reading-bg);color:var(--reading)}
+.pill.unread{background:var(--unread-bg);color:var(--unread)}
+.pill.loan{background:var(--loan-bg);color:var(--loan)}
+.pill.ex{border:1px dashed var(--muted);color:var(--muted)}
+.chev{color:var(--muted)}
+.empty{padding:40px 20px;text-align:center;display:flex;flex-direction:column;gap:10px;align-items:center;color:var(--muted)}
+.empty h2{color:var(--accent);font-size:22px}
+
+/* floating scan */
+.fab{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:5;display:flex;gap:8px;background:var(--surface);padding:6px;border-radius:999px;box-shadow:var(--shadow);border:1px solid var(--line)}
+.fab .btn{padding:12px 18px;white-space:nowrap}
+
+/* sheet */
+.scrim{position:fixed;inset:0;background:rgba(10,15,22,.45);z-index:20;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--surface);width:100%;max-width:640px;max-height:92%;overflow:auto;border-radius:26px 26px 0 0;padding-block:18px calc(20px + env(safe-area-inset-bottom,0px));padding-left:max(18px,env(safe-area-inset-left,0px));padding-right:max(18px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow)}
+@media (min-width:700px){.scrim{align-items:center}.sheet{border-radius:26px;max-height:88%}}
+.sheet-h{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.sheet-h h2{font-size:22px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid .full{grid-column:1/-1}
+@media (max-width:440px){.grid{grid-template-columns:1fr}}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;min-width:0}
+label.f input,label.f select,label.f textarea{text-transform:none;letter-spacing:0;font-weight:400;font-size:15px;color:var(--ink);border:1.5px solid var(--line);background:var(--bg);border-radius:12px;padding:9px 10px;width:100%;min-width:0}
+.mono{font-family:var(--f-mono)}
+.hint{font-size:12px;color:var(--muted);text-transform:none;letter-spacing:0;font-weight:400}
+.hint.bad{color:var(--loan)}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);background:var(--bg);border:1.5px solid var(--line);border-radius:999px;padding:3px;gap:3px}
+.seg button{border:0;background:transparent;border-radius:999px;padding:8px;font-weight:600;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.box{border:1.5px dashed var(--line);border-radius:18px;padding:12px;display:flex;flex-direction:column;gap:10px}
+.box h3{font-size:16px;color:var(--accent);font-weight:600}
+.scan-preview{display:flex;gap:12px;align-items:center}
+.scan-preview img{width:72px;height:96px;object-fit:cover;border-radius:6px;background:var(--surface-2)}
+.status{font-size:14px;display:flex;flex-direction:column;gap:4px}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp 0.8s linear infinite;vertical-align:-2px;margin-right:6px}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation-duration:3s}}
+.history{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:2px}
+.actions{display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap}
+.actions .right{display:flex;gap:8px;margin-left:auto}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(90px + env(safe-area-inset-bottom,0px));background:var(--accent);color:var(--accent-ink);padding:9px 18px;border-radius:999px;font-weight:700;font-size:14px;z-index:40;box-shadow:var(--shadow)}
+.notice{background:var(--surface);border:1.5px solid var(--line);border-radius:18px;padding:16px;color:var(--muted)}
+input[type=file]{display:none}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="hero">
+      <svg width="64" height="64" viewBox="0 0 64 64" aria-hidden="true">
+        <rect x="8" y="44" width="48" height="10" rx="3" fill="var(--accent)"/>
+        <rect x="12" y="34" width="42" height="10" rx="3" fill="var(--accent-2)"/>
+        <rect x="10" y="24" width="38" height="10" rx="3" fill="var(--loan)" opacity=".75"/>
+        <rect x="14" y="46" width="32" height="2" rx="1" fill="var(--surface)" opacity=".7"/>
+        <rect x="16" y="36" width="30" height="2" rx="1" fill="var(--surface)" opacity=".7"/>
+        <path d="M44 6c-3-4-9-2-8 3 1 4 8 8 8 8s7-4 8-8c1-5-5-7-8-3z" fill="var(--accent)"/>
+      </svg>
+      <div>
+        <h1>Home Library</h1>
+        <div class="sub" id="subline">Every book on your shelves, read or waiting, home or lent out.</div>
+        <span class="stamp">Ex libris</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="stats" role="group" aria-label="Filter by status">
+    <button class="stat" data-filter="all" aria-pressed="true"><b id="n-all">–</b><span>Owned</span></button>
+    <button class="stat read" data-filter="read" aria-pressed="false"><b id="n-read">–</b><span>Read</span></button>
+    <button class="stat" data-filter="toread" aria-pressed="false"><b id="n-toread">–</b><span>To be read</span></button>
+    <button class="stat loan" data-filter="loan" aria-pressed="false"><b id="n-loan">–</b><span>Lent out</span></button>
+  </div>
+
+  <div class="tools">
+    <input id="q" type="search" placeholder="Search title, author, ISBN, borrower" aria-label="Search books">
+    <select id="sort" aria-label="Sort">
+      <option value="added">Recently added</option>
+      <option value="title">Title A–Z</option>
+      <option value="author">Author A–Z</option>
+      <option value="bought">Purchase date</option>
+    </select>
+  </div>
+
+  <div class="banner" id="exBanner" hidden>
+    <span>The books marked <b>example</b> are samples so you can see how it works.</span>
+    <button class="btn" id="clearEx">Remove examples</button>
+  </div>
+
+  <div id="listWrap">
+    <div class="notice" id="loading"><span class="spin"></span>Opening your catalog…</div>
+  </div>
+</div>
+
+<div class="fab" id="fab">
+  <button class="btn primary" id="scanBtn">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 8v8M10 8v8M13 8v8M17 8v8"/></svg>
+    Scan a book
+  </button>
+  <button class="btn" id="addBtn">Add by hand</button>
+</div>
+<input type="file" id="camera" accept="image/*" capture="environment">
+<input type="file" id="coverCam" accept="image/*" capture="environment">
+
+<div class="scrim" id="scrim" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <div class="sheet-h">
+      <h2 id="sheetTitle">Add a book</h2>
+      <button class="btn ghost" id="closeSheet" aria-label="Close">Close</button>
+    </div>
+
+    <div class="box" id="scanBox" hidden>
+      <div class="scan-preview">
+        <img id="scanImg" alt="Photo you took">
+        <div class="status" id="scanStatus"></div>
+      </div>
+    </div>
+
+    <form id="form" class="grid" autocomplete="off">
+      <label class="f full">Title<input id="f-title" required></label>
+      <label class="f full">Author<input id="f-author"></label>
+      <label class="f">ISBN<input id="f-isbn" class="mono" inputmode="numeric"><span class="hint" id="isbnHint"></span></label>
+      <label class="f">Year published<input id="f-year" inputmode="numeric"></label>
+      <div class="full" style="display:flex;gap:8px;flex-wrap:wrap">
+        <button type="button" class="btn" id="lookupBtn">Fill details from ISBN</button>
+        <button type="button" class="btn" id="coverBtn">Add cover photo</button>
+        <img id="coverPrev" alt="Cover" hidden style="width:40px;height:56px;object-fit:cover;border-radius:4px">
+      </div>
+
+      <div class="full box">
+        <h3>Purchase</h3>
+        <div class="grid">
+          <label class="f">Bought on<input id="f-bought" type="date"></label>
+          <label class="f">Price<input id="f-price" inputmode="decimal" placeholder="e.g. 18.99"></label>
+          <label class="f full">Bought from<input id="f-from" placeholder="Shop, website, gift…"></label>
+        </div>
+      </div>
+
+      <div class="full box">
+        <h3>Reading</h3>
+        <div class="seg" id="seg">
+          <button type="button" data-v="unread" aria-pressed="true">Not read</button>
+          <button type="button" data-v="reading" aria-pressed="false">Reading</button>
+          <button type="button" data-v="read" aria-pressed="false">Read</button>
+        </div>
+        <label class="f" id="finishedWrap" hidden>Finished on<input id="f-finished" type="date"></label>
+      </div>
+
+      <div class="full box">
+        <h3>Loan</h3>
+        <div id="loanOut">
+          <div class="grid">
+            <label class="f">Lent to<input id="f-loanTo" placeholder="Name"></label>
+            <label class="f">Lent on<input id="f-loanOn" type="date"></label>
+          </div>
+        </div>
+        <button type="button" class="btn" id="returnBtn" hidden>Mark as returned</button>
+        <div class="history" id="loanHist"></div>
+      </div>
+
+      <label class="f full">Notes<textarea id="f-notes" rows="2"></textarea></label>
+
+      <div class="full actions">
+        <button type="button" class="btn danger" id="delBtn" hidden>Delete</button>
+        <div class="right">
+          <button type="button" class="btn" id="cancelBtn">Cancel</button>
+          <button type="submit" class="btn primary" id="saveBtn">Save book</button>
+        </div>
+      </div>
+      <div class="full box" id="delConfirm" hidden>
+        <span>Delete this book from your catalog? This can't be undone.</span>
+        <div style="display:flex;gap:8px"><button type="button" class="btn danger" id="delYes">Delete book</button><button type="button" class="btn" id="delNo">Keep it</button></div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+let db = null, col = null, sample = null, assets = null, canWrite = true;
+let books = [];
+let filter = "all";
+let editing = null;           // book object or null for new
+let draft = {};               // extra draft fields (coverId, loanHistory, etc.)
+let pendingCover = null;      // Blob waiting to upload
+let scanBlob = null;
+const today = () => new Date().toISOString().slice(0,10);
+
+/* ---------- ISBN helpers ---------- */
+function cleanIsbn(s){ return String(s||"").toUpperCase().replace(/[^0-9X]/g,""); }
+function valid13(d){ if(!/^\d{13}$/.test(d)) return false; let s=0; for(let i=0;i<12;i++) s+= +d[i]*(i%2?3:1); return (10 - s%10)%10 === +d[12]; }
+function valid10(d){ if(!/^\d{9}[\dX]$/.test(d)) return false; let s=0; for(let i=0;i<10;i++) s+=(d[i]==="X"?10:+d[i])*(10-i); return s%11===0; }
+function to13(d){ if(d.length!==10) return d; const b="978"+d.slice(0,9); let s=0; for(let i=0;i<12;i++) s+= +b[i]*(i%2?3:1); return b+((10-s%10)%10); }
+function normIsbn(s){ const d=cleanIsbn(s); if(valid13(d)) return d; if(valid10(d)) return to13(d); return null; }
+function fmtIsbn(d){ return d && d.length===13 ? d.slice(0,3)+"-"+d.slice(3,12)+"-"+d[12] : (d||""); }
+
+/* ---------- utils ---------- */
+function esc(s){ return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function hue(s){ let h=0; for(const c of String(s)) h=(h*31+c.charCodeAt(0))%360; return h; }
+function daysSince(d){ if(!d) return 0; return Math.max(0,Math.round((Date.now()-new Date(d+"T12:00:00").getTime())/864e5)); }
+function fmtDate(d){ if(!d) return ""; try{ return new Date(d+"T12:00:00").toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"}); }catch{ return d; } }
+let toastT; function toast(m){ const t=$("toast"); t.textContent=m; t.hidden=false; clearTimeout(toastT); toastT=setTimeout(()=>t.hidden=true,2600); }
+function coverUrl(b){ return b.coverId ? "/_blob/"+b.coverId : null; }
+
+/* ---------- render ---------- */
+function counts(){
+  const c={all:books.length,read:0,toread:0,loan:0};
+  for(const b of books){ if(b.status==="read") c.read++; else c.toread++; if(b.loanTo) c.loan++; }
+  return c;
+}
+function match(b){
+  if(filter==="read" && b.status!=="read") return false;
+  if(filter==="toread" && b.status==="read") return false;
+  if(filter==="loan" && !b.loanTo) return false;
+  const q=$("q").value.trim().toLowerCase();
+  if(!q) return true;
+  return [b.title,b.author,b.isbn,b.loanTo,b.from].some(v=>String(v||"").toLowerCase().includes(q.replace(/-/g,"")) || String(v||"").toLowerCase().includes(q));
+}
+function sorted(list){
+  const k=$("sort").value, s=(a,b)=>String(a||"").localeCompare(String(b||""));
+  return [...list].sort((a,b)=>{
+    if(k==="title") return s(a.title,b.title);
+    if(k==="author") return s(a.author,b.author)||s(a.title,b.title);
+    if(k==="bought") return s(b.boughtOn,a.boughtOn);
+    return (b.addedAt||0)-(a.addedAt||0);
+  });
+}
+function render(){
+  const c=counts();
+  $("n-all").textContent=c.all; $("n-read").textContent=c.read; $("n-toread").textContent=c.toread; $("n-loan").textContent=c.loan;
+  document.querySelectorAll(".stat").forEach(b=>b.setAttribute("aria-pressed", b.dataset.filter===filter));
+  $("exBanner").hidden = !books.some(b=>b.example) || !canWrite;
+  const yr=new Date().getFullYear(), boughtYr=books.filter(b=>(b.boughtOn||"").startsWith(String(yr))).length;
+  $("subline").textContent = books.length ? `${c.all} books · ${boughtYr} bought in ${yr} · ${c.loan} lent out` : "Every book on your shelves, read or waiting, home or lent out.";
+
+  const wrap=$("listWrap");
+  if(!books.length){
+    wrap.innerHTML=`<div class="list"><div class="empty"><svg width="96" height="70" viewBox="0 0 96 70" aria-hidden="true"><path d="M48 18C38 10 22 8 8 10v50c14-2 30 0 40 8 10-8 26-10 40-8V10c-14-2-30 0-40 8z" fill="var(--surface-2)" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round"/><path d="M48 18v50" stroke="var(--accent)" stroke-width="2.5"/><path d="M18 24h20M18 32h20M18 40h14M58 24h20M58 32h20M58 40h14" stroke="var(--accent-2)" stroke-width="2.5" stroke-linecap="round"/><path d="M48 6c-2-3-7-2-6 2 .8 3 6 6 6 6s5-3 6-6c1-4-4-5-6-2z" fill="var(--accent)"/></svg><h2>Your shelves are waiting</h2><div>Tap <b>Scan a book</b> and photograph the barcode on the back cover. The ISBN is read from the photo and the title and author are filled in for you.</div></div></div>`;
+    return;
+  }
+  const shown=sorted(books.filter(match));
+  if(!shown.length){ wrap.innerHTML=`<div class="list"><div class="empty">No books on this shelf yet.</div></div>`; return; }
+  wrap.innerHTML=`<div class="shelf-list"><div class="list">${shown.map(b=>{
+    const cu=coverUrl(b);
+    const pal=["#e0528b","#c2709b","#9b6fd0","#ef8aa8","#d4789b","#b85c8e","#e9a07a","#7f8fd6"];
+    const cov0 = cu ? `<img class="cover" src="${esc(cu)}" alt="">`
+      : `<div class="cover" style="background:${pal[hue(b.title)%pal.length]}">${esc((b.title||"?").split(/\s+/).slice(0,3).join(" "))}</div>`;
+    const cov = `<div class="cover-wrap">${cov0}${b.status==="reading"?'<span class="ribbon" title="Currently reading"></span>':""}</div>`;
+    const st = b.status==="read"?`<span class="pill read">Read</span>`:b.status==="reading"?`<span class="pill reading">Reading</span>`:`<span class="pill unread">Not read</span>`;
+    const ln = b.loanTo?`<span class="pill loan">Lent to ${esc(b.loanTo)} · ${daysSince(b.loanOn)}d</span>`:"";
+    const ex = b.example?`<span class="pill ex">example</span>`:"";
+    return `<button class="row" data-id="${esc(b.id)}">${cov}<div class="meta"><div class="t">${esc(b.title||"Untitled")}</div><div class="a">${esc(b.author||"Unknown author")}${b.year?" · "+esc(b.year):""}</div><div class="chips">${st}${ln}${ex}</div></div><span class="chev" aria-hidden="true">›</span></button>`;
+  }).join("")}</div></div><div class="foot">♡ ${shown.length} ${shown.length===1?"book":"books"} on this shelf ♡</div>`;
+}
+
+/* ---------- sheet ---------- */
+function setStatus(v){
+  draft.status=v;
+  document.querySelectorAll("#seg button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===v));
+  $("finishedWrap").hidden = v!=="read";
+  if(v==="read" && !$("f-finished").value) $("f-finished").value=today();
+}
+function isbnHint(){
+  const raw=$("f-isbn").value, d=cleanIsbn(raw), h=$("isbnHint");
+  h.classList.remove("bad");
+  if(!d){ h.textContent=""; return; }
+  const n=normIsbn(d);
+  if(n){ h.textContent="Check digit OK"; const dup=books.find(b=>b.isbn===n && (!editing||b.id!==editing.id)); if(dup){ h.textContent=`You already own this: “${dup.title}”`; h.classList.add("bad"); } }
+  else { h.textContent = d.length<10 ? "" : "Check digit doesn't match. Re-check the number."; h.classList.add("bad"); }
+}
+function loanUi(){
+  const b=editing, out=b&&b.loanTo;
+  $("returnBtn").hidden=!out;
+  const hist=(draft.loanHistory||[]);
+  $("loanHist").innerHTML = hist.length ? "Past loans:<br>"+hist.slice().reverse().map(h=>`${esc(h.to)} · ${fmtDate(h.on)} → ${fmtDate(h.back)}`).join("<br>") : "";
+}
+function openSheet(book){
+  editing=book||null; pendingCover=null;
+  draft={status:book?.status||"unread",coverId:book?.coverId||null,loanHistory:book?.loanHistory||[]};
+  $("sheetTitle").textContent=book?"Edit book":"Add a book";
+  $("f-title").value=book?.title||""; $("f-author").value=book?.author||"";
+  $("f-isbn").value=book?.isbn?fmtIsbn(book.isbn):""; $("f-year").value=book?.year||"";
+  $("f-bought").value=book?.boughtOn||(book?"":today()); $("f-price").value=book?.price??""; $("f-from").value=book?.from||"";
+  $("f-finished").value=book?.finishedOn||""; $("f-loanTo").value=book?.loanTo||""; $("f-loanOn").value=book?.loanOn||"";
+  $("f-notes").value=book?.notes||"";
+  setStatus(draft.status); isbnHint(); loanUi();
+  const cu=book&&coverUrl(book); $("coverPrev").hidden=!cu; if(cu) $("coverPrev").src=cu;
+  $("coverBtn").textContent = cu?"Replace cover photo":"Add cover photo";
+  $("coverBtn").hidden = !assets;
+  $("lookupBtn").hidden = !sample;
+  $("delBtn").hidden=!book||!canWrite; $("delConfirm").hidden=true;
+  $("saveBtn").disabled=!canWrite;
+  $("scanBox").hidden=true;
+  $("scrim").hidden=false;
+}
+function closeSheet(){ $("scrim").hidden=true; editing=null; scanBlob=null; }
+
+/* ---------- image helpers ---------- */
+function loadImg(src){ return new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=src; }); }
+async function shrink(file,max,q=0.85){
+  const url=URL.createObjectURL(file); const img=await loadImg(url); URL.revokeObjectURL(url);
+  const s=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight));
+  const c=document.createElement("canvas"); c.width=Math.round(img.naturalWidth*s); c.height=Math.round(img.naturalHeight*s);
+  c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+  const blob=await new Promise(r=>c.toBlob(r,"image/jpeg",q));
+  return {canvas:c,blob};
+}
+async function decodeBarcode(canvas){
+  try{
+    if("BarcodeDetector" in window){
+      const det=new BarcodeDetector({formats:["ean_13","ean_8","upc_a"]});
+      const r=await det.detect(canvas); for(const x of r){ const n=normIsbn(x.rawValue); if(n) return n; }
+    }
+  }catch(e){}
+  if(!window.ZXing) return null;
+  const tryOne = async (cv)=>{
+    try{
+      const hints=new Map(); hints.set(ZXing.DecodeHintType.TRY_HARDER,true);
+      hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,[ZXing.BarcodeFormat.EAN_13,ZXing.BarcodeFormat.EAN_8,ZXing.BarcodeFormat.UPC_A]);
+      const reader=new ZXing.BrowserMultiFormatReader(hints);
+      const img=await loadImg(cv.toDataURL("image/jpeg",0.92));
+      const r=await reader.decodeFromImageElement(img);
+      return normIsbn(r.getText());
+    }catch(e){ return null; }
+  };
+  let n=await tryOne(canvas); if(n) return n;
+  // try rotated 90° (barcode photographed sideways)
+  const r=document.createElement("canvas"); r.width=canvas.height; r.height=canvas.width;
+  const g=r.getContext("2d"); g.translate(r.width/2,r.height/2); g.rotate(Math.PI/2); g.drawImage(canvas,-canvas.width/2,-canvas.height/2);
+  return await tryOne(r);
+}
+
+/* ---------- Claude lookup ---------- */
+async function askClaude(isbn,imageBlob){
+  if(!sample) return null;
+  const prompt=`You are helping catalog a book in a home library.
+${isbn?`The ISBN decoded from the barcode is ${isbn}.`:"No barcode could be decoded."}
+${imageBlob?"A photo of the book (usually the back cover with the barcode, sometimes the front) is attached. Read the ISBN digits printed near the barcode if no ISBN is given above, and read the title and author from the cover if visible.":"No photo is available; use your own knowledge of this ISBN."}
+Return ONLY a JSON object: {"isbn":"digits only or empty","title":"","author":"","year":"4-digit year or empty","confidence":"high|medium|low"}.
+Leave a field empty rather than guess. If you only recognise the ISBN from memory and are unsure, set confidence to "low".`;
+  const opts={modelTier:"default",cache:false};
+  if(imageBlob) opts.images=[imageBlob];
+  return await sample.json(prompt,opts);
+}
+
+async function handleScan(file){
+  openSheet(null);
+  $("scanBox").hidden=false;
+  const st=$("scanStatus");
+  st.innerHTML=`<span><span class="spin"></span>Reading the barcode…</span>`;
+  try{
+    const big=await shrink(file,1800,0.9);
+    $("scanImg").src=URL.createObjectURL(big.blob);
+    scanBlob=big.blob;
+    let isbn=await decodeBarcode(big.canvas);
+    if(isbn){ $("f-isbn").value=fmtIsbn(isbn); isbnHint(); }
+    if(!sample){
+      st.innerHTML = isbn ? `<b>ISBN ${fmtIsbn(isbn)}</b><span class="hint">Type the title and author below.</span>` : `<b>No barcode found.</b><span class="hint">Try again closer and well lit, or type the ISBN.</span>`;
+      return;
+    }
+    st.innerHTML=`<span>${isbn?`<b>ISBN ${fmtIsbn(isbn)}</b><br>`:""}<span class="spin"></span>Looking up title and author…</span>`;
+    let imgForClaude=big.blob;
+    try{ const lim=await sample.limits(); if(!lim.images || big.blob.size>lim.images.maxInputBytes){ imgForClaude=(await shrink(file,1100,0.8)).blob; if(!lim.images) imgForClaude=null; } }catch(e){}
+    const r=await askClaude(isbn,imgForClaude);
+    if(r){
+      if(!isbn && r.isbn){ const n=normIsbn(r.isbn); if(n){ isbn=n; $("f-isbn").value=fmtIsbn(n); isbnHint(); } }
+      if(r.title && !$("f-title").value) $("f-title").value=r.title;
+      if(r.author && !$("f-author").value) $("f-author").value=r.author;
+      if(r.year && !$("f-year").value) $("f-year").value=r.year;
+    }
+    const low = r && r.confidence==="low";
+    st.innerHTML = $("f-title").value
+      ? `<b>${esc($("f-title").value)}</b><span class="hint">${isbn?"ISBN "+fmtIsbn(isbn)+" · ":""}${low?"Not sure about this one. Check the details.":"Check the details, then save."}</span>`
+      : `<b>${isbn?"ISBN "+fmtIsbn(isbn):"Couldn't read this photo."}</b><span class="hint">Fill in the title and author below.</span>`;
+  }catch(e){
+    st.innerHTML=`<b>Couldn't read that photo.</b><span class="hint">${esc(e && e.code==="not_granted" ? "Lookup is turned off for this page. Type the details below." : "Type the details below, or try another photo.")}</span>`;
+  }
+}
+
+/* ---------- save ---------- */
+async function save(ev){
+  ev.preventDefault();
+  if(!col) return;
+  const title=$("f-title").value.trim(); if(!title){ $("f-title").focus(); return; }
+  const isbnRaw=cleanIsbn($("f-isbn").value);
+  const loanTo=$("f-loanTo").value.trim();
+  const data={
+    title, author:$("f-author").value.trim(),
+    isbn: normIsbn(isbnRaw)||isbnRaw||"",
+    year:$("f-year").value.trim(),
+    boughtOn:$("f-bought").value||"", price:$("f-price").value.trim(), from:$("f-from").value.trim(),
+    status:draft.status, finishedOn: draft.status==="read" ? ($("f-finished").value||"") : "",
+    loanTo, loanOn: loanTo ? ($("f-loanOn").value||today()) : "",
+    loanHistory: draft.loanHistory||[],
+    notes:$("f-notes").value.trim(),
+    coverId: draft.coverId||null,
+    example: false,
+  };
+  $("saveBtn").disabled=true;
+  try{
+    if(pendingCover && assets){
+      try{ const up=await assets.upload(pendingCover); data.coverId=up.id; }catch(e){ toast("Cover photo couldn't be saved"); }
+    }
+    if(editing){ await col.doc(editing.id).update(data); toast("Saved"); }
+    else { data.addedAt=Date.now(); const ref=col.doc(); await ref.set(data); toast(`Added “${title}” to your shelf ♡`); }
+    closeSheet();
+  }catch(e){ toast("Couldn't save: "+(e.message||e.code||"try again")); }
+  finally{ $("saveBtn").disabled=!canWrite; }
+}
+
+/* ---------- wire up ---------- */
+document.querySelectorAll(".stat").forEach(b=>b.addEventListener("click",()=>{ filter = (filter===b.dataset.filter && filter!=="all") ? "all" : b.dataset.filter; render(); }));
+$("q").addEventListener("input",render); $("sort").addEventListener("change",render);
+$("listWrap").addEventListener("click",e=>{ const r=e.target.closest(".row"); if(!r) return; const b=books.find(x=>x.id===r.dataset.id); if(b) openSheet(b); });
+$("scanBtn").addEventListener("click",()=>{ $("camera").value=""; $("camera").click(); });
+$("camera").addEventListener("change",e=>{ const f=e.target.files[0]; if(f) handleScan(f); });
+$("addBtn").addEventListener("click",()=>openSheet(null));
+$("closeSheet").addEventListener("click",closeSheet); $("cancelBtn").addEventListener("click",closeSheet);
+$("scrim").addEventListener("click",e=>{ if(e.target===$("scrim")) closeSheet(); });
+document.addEventListener("keydown",e=>{ if(e.key==="Escape" && !$("scrim").hidden) closeSheet(); });
+$("seg").addEventListener("click",e=>{ const b=e.target.closest("button"); if(b) setStatus(b.dataset.v); });
+$("f-isbn").addEventListener("input",isbnHint);
+$("f-loanTo").addEventListener("input",()=>{ if($("f-loanTo").value && !$("f-loanOn").value) $("f-loanOn").value=today(); });
+$("returnBtn").addEventListener("click",()=>{
+  const to=$("f-loanTo").value.trim()||editing?.loanTo; if(!to) return;
+  draft.loanHistory=[...(draft.loanHistory||[]),{to,on:$("f-loanOn").value||editing?.loanOn||"",back:today()}];
+  $("f-loanTo").value=""; $("f-loanOn").value=""; $("returnBtn").hidden=true; loanUi();
+  toast("Marked returned. Save to keep it.");
+});
+$("coverBtn").addEventListener("click",()=>{ $("coverCam").value=""; $("coverCam").click(); });
+$("coverCam").addEventListener("change",async e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const s=await shrink(f,500,0.82); pendingCover=s.blob;
+  $("coverPrev").src=URL.createObjectURL(s.blob); $("coverPrev").hidden=false; $("coverBtn").textContent="Replace cover photo";
+});
+$("lookupBtn").addEventListener("click",async()=>{
+  const n=normIsbn($("f-isbn").value);
+  if(!n && !scanBlob){ toast("Enter a valid ISBN first"); return; }
+  const btn=$("lookupBtn"); btn.disabled=true; btn.innerHTML=`<span class="spin"></span>Looking up…`;
+  try{
+    const r=await askClaude(n,scanBlob);
+    if(r){ if(r.title) $("f-title").value=r.title; if(r.author) $("f-author").value=r.author; if(r.year) $("f-year").value=r.year;
+      toast(r.confidence==="low"?"Filled in, but not sure. Check it.":"Details filled in"); }
+  }catch(e){ toast(e.code==="not_granted"?"Lookup is turned off for this page":"Lookup failed. Type it in."); }
+  finally{ btn.disabled=false; btn.textContent="Fill details from ISBN"; }
+});
+$("form").addEventListener("submit",save);
+$("delBtn").addEventListener("click",()=>{ $("delConfirm").hidden=false; });
+$("delNo").addEventListener("click",()=>{ $("delConfirm").hidden=true; });
+$("delYes").addEventListener("click",async()=>{
+  if(!editing) return; const t=editing.title;
+  try{ await col.doc(editing.id).delete(); closeSheet(); toast(`Deleted “${t}”`); }catch(e){ toast("Couldn't delete"); }
+});
+$("clearEx").addEventListener("click",async()=>{
+  const ex=books.filter(b=>b.example);
+  for(const b of ex){ try{ await col.doc(b.id).delete(); }catch(e){} }
+  toast("Examples removed");
+});
+
+/* ---------- boot ---------- */
+async function boot(){
+  if(!window.claude || !claude.use){ showNotice("Open this page on claude.ai to use your catalog."); return; }
+  const timer=setTimeout(()=>showNotice("Your catalog is taking a while to load. Check your connection, then reopen the page."),10000);
+  db=await claude.use("db");
+  if(!db){ clearTimeout(timer); showNotice("Sign in to claude.ai to open your library."); $("fab").hidden=true; return; }
+  claude.use("sample").then(s=>{ sample=s; });
+  claude.use("assets").then(a=>{ assets=a; });
+  claude.use("user").then(async u=>{ try{ const c=u && u.can ? await u.can("data.write") : null; if(c===false){ canWrite=false; $("fab").hidden=true; render(); } }catch(e){} });
+  col=db.collection("books");
+  col.onSnapshot(snap=>{
+    clearTimeout(timer);
+    books=snap.docs.map(d=>({id:d.id,...d.data()}));
+    render();
+  },err=>{ clearTimeout(timer); showNotice("Couldn't load your catalog ("+(err.code||"error")+"). Reopen the page to try again."); });
+}
+function showNotice(m){ $("listWrap").innerHTML=`<div class="notice">${esc(m)}</div>`; }
+boot();
+})();
+</script>
